@@ -89,6 +89,17 @@ button {
   place-items: center;
 }
 
+.mini-button {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .hero-panel,
 .panel {
   background: var(--panel);

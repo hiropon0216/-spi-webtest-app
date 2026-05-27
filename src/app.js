@@ -5,6 +5,10 @@ const OLD_STORAGE_KEY = "spi-webtest-progress-v1";
 const MOCK_SIZE = 60;
 const MOCK_SECONDS = 35 * 60;
 const CHAPTER_TARGET_MINUTES = 15;
+const MOCK_CONFIG = {
+  verbal: { label: "言語模試", size: 40, seconds: 15 * 60 },
+  nonverbal: { label: "非言語模試", size: 20, seconds: 20 * 60 }
+};
 
 const app = document.querySelector("#app");
 
@@ -157,11 +161,12 @@ function renderHome() {
       </section>
 
       <section class="panel">
-        <h1 class="title">SPI Webテスティング風トレーニング</h1>
-        <p class="subtitle">章別で未正解を減らすか、35分の模擬試験で本番感覚を測ります。</p>
+        <h1 class="title">SPI Webテスティング トレーニング</h1>
+        <p class="subtitle">章別で未正解を減らすか、言語・非言語の模試で本番感覚を測ります。</p>
         <div class="actions">
           <button class="primary-button" data-action="chapters">章別総合問題集</button>
-          <button class="secondary-button" data-action="mock">模擬試験</button>
+          <button class="secondary-button" data-action="mock-verbal">言語模試</button>
+          <button class="secondary-button" data-action="mock-nonverbal">非言語模試</button>
         </div>
       </section>
 
@@ -253,15 +258,19 @@ function startChapter(chapterId) {
   render();
 }
 
-function startMock() {
+function startMock(area) {
+  const config = MOCK_CONFIG[area];
+  const pool = questions.filter((question) => question.area === area);
   state = {
     screen: "question",
     session: {
       type: "mock",
+      area,
+      label: config.label,
       startedAt: Date.now(),
-      durationSec: MOCK_SECONDS,
+      durationSec: config.seconds,
       current: 0,
-      questions: prepareSessionQuestions(questions).slice(0, Math.min(MOCK_SIZE, questions.length)),
+      questions: prepareSessionQuestions(pool).slice(0, Math.min(config.size, pool.length)),
       answers: []
     }
   };
@@ -280,9 +289,10 @@ function renderQuestion() {
     <main class="screen">
       <header class="test-header">
         <div class="test-meta">
-          <span>${session.type === "mock" ? "模擬試験" : "章別演習"}</span>
+          <span>${session.type === "mock" ? session.label : "章別演習"}</span>
           <span>${session.current + 1} / ${session.questions.length}</span>
           ${remaining === null ? `<span>${formatTime((Date.now() - session.startedAt) / 1000)}</span>` : `<span class="timer ${remaining < 180 ? "warning" : ""}" data-timer>${formatTime(remaining)}</span>`}
+          <button class="mini-button" data-action="home" aria-label="ホームへ戻る">ホーム</button>
         </div>
         <div class="progress-track" aria-label="進行状況">
           <div class="progress-fill" style="--value: ${progressRate}%"></div>
@@ -392,7 +402,7 @@ function renderResult() {
   app.innerHTML = `
     <main class="screen">
       <section class="panel">
-        <h1 class="title">${session.type === "mock" ? "模擬試験 結果" : `${chapter.title} 結果`}</h1>
+        <h1 class="title">${session.type === "mock" ? `${session.label} 結果` : `${chapter.title} 結果`}</h1>
         <div class="result-score" style="--score: ${session.accuracy}%">
           <div class="score-inner"><strong>${session.accuracy}%</strong></div>
         </div>
@@ -420,7 +430,7 @@ function renderResult() {
       </section>
 
       <div class="actions">
-        <button class="primary-button" data-action="${session.type === "mock" ? "mock" : "chapters"}">${session.type === "mock" ? "もう一度模試" : "章一覧へ"}</button>
+        <button class="primary-button" data-action="${session.type === "mock" ? `mock-${session.area}` : "chapters"}">${session.type === "mock" ? "もう一度模試" : "章一覧へ"}</button>
         <button class="secondary-button" data-action="home">ホームへ</button>
       </div>
     </main>
@@ -556,7 +566,8 @@ app.addEventListener("click", (event) => {
     state = { screen: "chapters", session: null };
     render();
   }
-  if (action === "mock") startMock();
+  if (action === "mock-verbal") startMock("verbal");
+  if (action === "mock-nonverbal") startMock("nonverbal");
   if (action === "export") exportProgress();
   if (action === "import") importProgress();
   if (action === "reset") resetProgress();
