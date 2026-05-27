@@ -1,4 +1,4 @@
-export const chapters = [
+const baseChapters = [
   { id: "verbal-words", title: "言語：語句・意味理解", area: "verbal", target: 80 },
   { id: "verbal-relations", title: "言語：二語関係", area: "verbal", target: 70 },
   { id: "verbal-sentences", title: "言語：文の完成・並べ替え", area: "verbal", target: 60 },
@@ -419,7 +419,7 @@ function buildTable() {
   return result;
 }
 
-export const questions = [
+const generatedQuestions = [
   ...buildWords(),
   ...buildRelations(),
   ...buildSentences(),
@@ -431,3 +431,40 @@ export const questions = [
   ...buildLogic(),
   ...buildTable()
 ];
+
+const CHAPTER_SIZE = 20;
+
+function splitGeneratedQuestions() {
+  const splitChapters = [];
+  const splitQuestions = [];
+
+  baseChapters.forEach((chapter) => {
+    const items = generatedQuestions.filter((question) => question.chapterId === chapter.id);
+    const totalParts = Math.ceil(items.length / CHAPTER_SIZE);
+    for (let part = 0; part < totalParts; part += 1) {
+      const partItems = items.slice(part * CHAPTER_SIZE, (part + 1) * CHAPTER_SIZE);
+      const splitId = `${chapter.id}-${String(part + 1).padStart(2, "0")}`;
+      splitChapters.push({
+        id: splitId,
+        title: `${chapter.title} ${part + 1}`,
+        area: chapter.area,
+        parentId: chapter.id,
+        target: partItems.length
+      });
+      partItems.forEach((question) => {
+        splitQuestions.push({
+          ...question,
+          chapterId: splitId,
+          parentChapterId: chapter.id
+        });
+      });
+    }
+  });
+
+  return { splitChapters, splitQuestions };
+}
+
+const split = splitGeneratedQuestions();
+
+export const chapters = split.splitChapters;
+export const questions = split.splitQuestions;

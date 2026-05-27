@@ -148,6 +148,16 @@ button {
   transition: width 650ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.timer-track {
+  height: 6px;
+  margin-top: 8px;
+}
+
+.timer-fill {
+  background: linear-gradient(90deg, var(--accent), var(--brand-2));
+  transition: width 1000ms linear;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

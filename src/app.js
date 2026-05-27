@@ -4,6 +4,7 @@ const STORAGE_KEY = "spi-webtest-progress-v2";
 const OLD_STORAGE_KEY = "spi-webtest-progress-v1";
 const MOCK_SIZE = 60;
 const MOCK_SECONDS = 35 * 60;
+const CHAPTER_TARGET_MINUTES = 15;
 
 const app = document.querySelector("#app");
 
@@ -64,6 +65,25 @@ function shuffle(items) {
     [copied[i], copied[j]] = [copied[j], copied[i]];
   }
   return copied;
+}
+
+function shuffleChoices(question) {
+  const choices = question.choices.map((choice, index) => ({
+    text: choice,
+    originalIndex: index
+  }));
+  const shuffled = shuffle(choices);
+  return {
+    ...question,
+    choices: shuffled.map((choice) => choice.text),
+    answer: shuffled.findIndex((choice) => choice.originalIndex === question.answer),
+    originalAnswer: question.answer,
+    correctChoice: question.choices[question.answer]
+  };
+}
+
+function prepareSessionQuestions(pool) {
+  return shuffle(pool).map(shuffleChoices);
 }
 
 function formatTime(seconds) {
@@ -226,7 +246,7 @@ function startChapter(chapterId) {
       startedAt: Date.now(),
       durationSec: null,
       current: 0,
-      questions: shuffle(pool),
+      questions: prepareSessionQuestions(pool),
       answers: []
     }
   };
@@ -241,7 +261,7 @@ function startMock() {
       startedAt: Date.now(),
       durationSec: MOCK_SECONDS,
       current: 0,
-      questions: shuffle(questions).slice(0, Math.min(MOCK_SIZE, questions.length)),
+      questions: prepareSessionQuestions(questions).slice(0, Math.min(MOCK_SIZE, questions.length)),
       answers: []
     }
   };
@@ -254,6 +274,7 @@ function renderQuestion() {
   const question = session.questions[session.current];
   const progressRate = percent(session.current, session.questions.length);
   const remaining = session.durationSec ? Math.max(0, session.durationSec - (Date.now() - session.startedAt) / 1000) : null;
+  const timeRate = session.durationSec ? percent(remaining, session.durationSec) : 100;
 
   app.innerHTML = `
     <main class="screen">
@@ -266,6 +287,11 @@ function renderQuestion() {
         <div class="progress-track" aria-label="進行状況">
           <div class="progress-fill" style="--value: ${progressRate}%"></div>
         </div>
+        ${remaining === null ? "" : `
+          <div class="progress-track timer-track" aria-label="残り時間">
+            <div class="progress-fill timer-fill" data-time-fill style="--value: ${timeRate}%"></div>
+          </div>
+        `}
       </header>
       <section class="question-card">
         <p class="question-text">${escapeHtml(question.prompt)}</p>
@@ -350,15 +376,17 @@ function finishSession() {
 
 function renderResult() {
   const session = state.session;
-  const wrongAnswers = session.answers
-    .filter((answer) => !answer.correct)
+  const reviewedAnswers = session.answers
     .map((answer) => {
       const question = questions.find((item) => item.id === answer.questionId);
-      return { ...answer, question };
+      const sessionQuestion = session.questions.find((item) => item.id === answer.questionId);
+      return { ...answer, question: sessionQuestion || question };
     });
+  const actualWrongAnswers = reviewedAnswers.filter((answer) => !answer.correct);
+  const wrongAnswers = reviewedAnswers;
 
   const chapter = chapters.find((item) => item.id === session.chapterId);
-  const weakTags = summarizeWeakTags(wrongAnswers);
+  const weakTags = summarizeWeakTags(actualWrongAnswers);
   const areaStats = summarizeAreas(session.answers);
 
   app.innerHTML = `
@@ -387,8 +415,8 @@ function renderResult() {
       </section>
 
       <section class="panel">
-        <h2 class="panel-title">不正解レビュー</h2>
-        ${wrongAnswers.length ? `<div class="review-list">${wrongAnswers.slice(0, 20).map(renderReviewItem).join("")}</div>` : `<p class="subtitle">不正解はありません。いい流れです。</p>`}
+        <h2 class="panel-title">全問レビュー</h2>
+        <div class="review-list">${reviewedAnswers.map(renderReviewItem).join("")}</div>
       </section>
 
       <div class="actions">
@@ -439,6 +467,7 @@ function renderReviewItem(item) {
   return `
     <article class="review-item">
       <strong>${escapeHtml(item.question.prompt)}</strong>
+      <p>${item.correct ? "結果：正解" : "結果：不正解"}</p>
       <p>あなたの回答：${escapeHtml(item.question.choices[item.choiceIndex])}</p>
       <p>正解：${escapeHtml(item.question.choices[item.question.answer])}</p>
       <p>${escapeHtml(item.question.explanation)}</p>
@@ -488,6 +517,10 @@ function scheduleTimer() {
     if (timer) {
       timer.textContent = formatTime(remaining);
       timer.classList.toggle("warning", remaining < 180);
+    }
+    const timeFill = app.querySelector("[data-time-fill]");
+    if (timeFill) {
+      timeFill.style.setProperty("--value", `${percent(remaining, state.session.durationSec)}%`);
     }
     scheduleTimer();
   }, 1000);
