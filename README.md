@@ -1,2 +1,34 @@
-# -spi-webtest-app
-SPIのwebテスト対策問題集
+# SPI Webテスティング風トレーニング
+
+スマホで外出先から使える、SPI3 Webテスティング風の軽量問題集アプリです。
+
+## 特徴
+
+- 章別総合問題集
+- 模擬試験モード
+- 1度正解した問題は章別モードから除外
+- 進捗・正答率・所要時間をlocalStorageに保存
+- GitHub Pagesで無料公開可能
+- スマホのホーム画面追加を想定したPWA風構成
+
+## ローカル確認
+
+```powershell
+python -m http.server 5173
+```
+
+ブラウザで以下を開きます。
+
+```text
+http://localhost:5173/
+```
+
+同じWi-Fi上のスマホから確認する場合は、PCのIPv4アドレスを使って以下のように開きます。
+
+```text
+http://<PCのIPv4アドレス>:5173/
+```
+
+## GitHub Pages
+
+リポジトリの `Settings > Pages` から、`main` ブランチの `/root` を公開対象にしてください。
