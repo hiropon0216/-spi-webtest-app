@@ -182,6 +182,10 @@ button {
   margin: 14px 0;
 }
 
+.compact-actions {
+  margin-bottom: 0;
+}
+
 .primary-button,
 .secondary-button,
 .choice-button {
@@ -205,6 +209,10 @@ button {
   border-color: var(--line);
   color: var(--ink);
   font-weight: 750;
+}
+
+.danger-button {
+  color: var(--danger);
 }
 
 .primary-button:active,
@@ -315,6 +323,10 @@ button {
   line-height: 1.45;
 }
 
+.choice-button:disabled {
+  cursor: default;
+}
+
 .choice-button.correct {
   border-color: var(--ok);
   background: #e8f4ee;
@@ -370,6 +382,7 @@ button {
   color: var(--muted);
   line-height: 1.55;
   font-size: 14px;
+  white-space: pre-wrap;
 }
 
 .toast {

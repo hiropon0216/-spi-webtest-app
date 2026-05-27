@@ -1,7 +1,8 @@
 import { chapters, questions } from "./questions.js";
 
-const STORAGE_KEY = "spi-webtest-progress-v1";
-const MOCK_SIZE = 12;
+const STORAGE_KEY = "spi-webtest-progress-v2";
+const OLD_STORAGE_KEY = "spi-webtest-progress-v1";
+const MOCK_SIZE = 60;
 const MOCK_SECONDS = 35 * 60;
 
 const app = document.querySelector("#app");
@@ -21,7 +22,8 @@ function loadProgress() {
   };
 
   try {
-    return { ...fallback, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") };
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(OLD_STORAGE_KEY) || "{}";
+    return { ...fallback, ...JSON.parse(raw) };
   } catch {
     return fallback;
   }
@@ -56,7 +58,12 @@ function addBadge(progress, badge) {
 }
 
 function shuffle(items) {
-  return [...items].sort(() => Math.random() - 0.5);
+  const copied = [...items];
+  for (let i = copied.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copied[i], copied[j]] = [copied[j], copied[i]];
+  }
+  return copied;
 }
 
 function formatTime(seconds) {
@@ -92,7 +99,8 @@ function getHomeStats(progress) {
     total,
     overall: percent(masteredCount, total),
     mockAccuracy: mock ? mock.accuracy : 0,
-    todayCorrect
+    todayCorrect,
+    badges: progress.badges.length
   };
 }
 
@@ -130,7 +138,7 @@ function renderHome() {
 
       <section class="panel">
         <h1 class="title">SPI Webテスティング風トレーニング</h1>
-        <p class="subtitle">章別で未正解を減らすか、模擬試験で35分の本番感覚を測ります。</p>
+        <p class="subtitle">章別で未正解を減らすか、35分の模擬試験で本番感覚を測ります。</p>
         <div class="actions">
           <button class="primary-button" data-action="chapters">章別総合問題集</button>
           <button class="secondary-button" data-action="mock">模擬試験</button>
@@ -140,6 +148,15 @@ function renderHome() {
       <section class="panel">
         <h2 class="panel-title">次のおすすめ</h2>
         <p class="subtitle">${recommended}</p>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">進捗管理</h2>
+        <div class="actions compact-actions">
+          <button class="secondary-button" data-action="export">進捗をコピー</button>
+          <button class="secondary-button" data-action="import">進捗を復元</button>
+          <button class="secondary-button danger-button" data-action="reset">進捗をリセット</button>
+        </div>
       </section>
     </main>
   `;
@@ -184,7 +201,7 @@ function renderChapters() {
       <div class="topbar">
         <div>
           <h1 class="title">章別総合問題集</h1>
-          <p class="subtitle">正解済みの問題は出題されません。</p>
+          <p class="subtitle">正解済みの問題は出題されません。章を選ぶと未正解問題だけを続けて解きます。</p>
         </div>
         <button class="icon-button" data-action="home" aria-label="ホームへ戻る">⌂</button>
       </div>
@@ -244,7 +261,7 @@ function renderQuestion() {
         <div class="test-meta">
           <span>${session.type === "mock" ? "模擬試験" : "章別演習"}</span>
           <span>${session.current + 1} / ${session.questions.length}</span>
-          ${remaining === null ? `<span>${formatTime((Date.now() - session.startedAt) / 1000)}</span>` : `<span class="timer ${remaining < 180 ? "warning" : ""}">${formatTime(remaining)}</span>`}
+          ${remaining === null ? `<span>${formatTime((Date.now() - session.startedAt) / 1000)}</span>` : `<span class="timer ${remaining < 180 ? "warning" : ""}" data-timer>${formatTime(remaining)}</span>`}
         </div>
         <div class="progress-track" aria-label="進行状況">
           <div class="progress-fill" style="--value: ${progressRate}%"></div>
@@ -265,6 +282,9 @@ function answerQuestion(choiceIndex) {
   const question = session.questions[session.current];
   const correct = choiceIndex === question.answer;
   const button = app.querySelector(`[data-choice="${choiceIndex}"]`);
+  app.querySelectorAll(".choice-button").forEach((choice) => {
+    choice.disabled = true;
+  });
   button.classList.add(correct ? "correct" : "wrong");
   session.answers.push({
     questionId: question.id,
@@ -280,7 +300,7 @@ function answerQuestion(choiceIndex) {
       session.current += 1;
       render();
     }
-  }, 280);
+  }, 220);
 }
 
 function finishSession() {
@@ -318,6 +338,7 @@ function finishSession() {
 
   const masteredTotal = questions.filter((question) => progress.mastered[question.id]).length;
   if (masteredTotal >= 1) addBadge(progress, "初回正解");
+  if (masteredTotal >= 100) addBadge(progress, "100問攻略");
   if (accuracy >= 80) addBadge(progress, "80%到達");
   if (progress.streak.count >= 3) addBadge(progress, "3日連続");
 
@@ -337,6 +358,8 @@ function renderResult() {
     });
 
   const chapter = chapters.find((item) => item.id === session.chapterId);
+  const weakTags = summarizeWeakTags(wrongAnswers);
+  const areaStats = summarizeAreas(session.answers);
 
   app.innerHTML = `
     <main class="screen">
@@ -354,8 +377,18 @@ function renderResult() {
       </section>
 
       <section class="panel">
+        <h2 class="panel-title">分野別</h2>
+        <div class="review-list">${areaStats.map(renderAreaStat).join("")}</div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">次に伸ばすところ</h2>
+        <p class="subtitle">${weakTags.length ? weakTags.join(" / ") : "大きな弱点はありません。この調子で模試に進みましょう。"}</p>
+      </section>
+
+      <section class="panel">
         <h2 class="panel-title">不正解レビュー</h2>
-        ${wrongAnswers.length ? `<div class="review-list">${wrongAnswers.map(renderReviewItem).join("")}</div>` : `<p class="subtitle">不正解はありません。いい流れです。</p>`}
+        ${wrongAnswers.length ? `<div class="review-list">${wrongAnswers.slice(0, 20).map(renderReviewItem).join("")}</div>` : `<p class="subtitle">不正解はありません。いい流れです。</p>`}
       </section>
 
       <div class="actions">
@@ -363,6 +396,42 @@ function renderResult() {
         <button class="secondary-button" data-action="home">ホームへ</button>
       </div>
     </main>
+  `;
+}
+
+function summarizeWeakTags(wrongAnswers) {
+  const counts = new Map();
+  wrongAnswers.forEach((answer) => {
+    const tag = answer.question?.tag || "未分類";
+    counts.set(tag, (counts.get(tag) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([tag]) => tag);
+}
+
+function summarizeAreas(answers) {
+  const rows = new Map();
+  answers.forEach((answer) => {
+    const question = questions.find((item) => item.id === answer.questionId);
+    const label = question?.area === "verbal" ? "言語" : "非言語";
+    const row = rows.get(label) || { label, total: 0, correct: 0 };
+    row.total += 1;
+    if (answer.correct) row.correct += 1;
+    rows.set(label, row);
+  });
+  return [...rows.values()];
+}
+
+function renderAreaStat(item) {
+  const rate = percent(item.correct, item.total);
+  return `
+    <article class="review-item">
+      <strong>${item.label}：${rate}%</strong>
+      <div class="progress-track"><span class="progress-fill" style="--value: ${rate}%"></span></div>
+      <p>${item.correct}/${item.total} 問正解</p>
+    </article>
   `;
 }
 
@@ -377,15 +446,49 @@ function renderReviewItem(item) {
   `;
 }
 
+function exportProgress() {
+  const payload = JSON.stringify(loadProgress());
+  navigator.clipboard?.writeText(payload)
+    .then(() => showToast("進捗をコピーしました"))
+    .catch(() => window.prompt("進捗データをコピーしてください", payload));
+}
+
+function importProgress() {
+  const payload = window.prompt("復元する進捗データを貼り付けてください");
+  if (!payload) return;
+  try {
+    const parsed = JSON.parse(payload);
+    if (!parsed || typeof parsed !== "object") throw new Error("invalid");
+    saveProgress(parsed);
+    showToast("進捗を復元しました");
+    render();
+  } catch {
+    showToast("進捗データを読み込めませんでした");
+  }
+}
+
+function resetProgress() {
+  if (!window.confirm("進捗をすべてリセットします。よろしいですか？")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(OLD_STORAGE_KEY);
+  showToast("進捗をリセットしました");
+  render();
+}
+
 function scheduleTimer() {
   window.setTimeout(() => {
     if (state.screen !== "question" || state.session?.type !== "mock") return;
     const elapsed = (Date.now() - state.session.startedAt) / 1000;
+    const remaining = Math.max(0, state.session.durationSec - elapsed);
     if (elapsed >= state.session.durationSec) {
       finishSession();
       return;
     }
-    renderQuestion();
+    const timer = app.querySelector("[data-timer]");
+    if (timer) {
+      timer.textContent = formatTime(remaining);
+      timer.classList.toggle("warning", remaining < 180);
+    }
     scheduleTimer();
   }, 1000);
 }
@@ -421,6 +524,9 @@ app.addEventListener("click", (event) => {
     render();
   }
   if (action === "mock") startMock();
+  if (action === "export") exportProgress();
+  if (action === "import") importProgress();
+  if (action === "reset") resetProgress();
   if (chapterId) startChapter(chapterId);
   if (choice !== undefined) answerQuestion(Number(choice));
 });
