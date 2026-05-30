@@ -142,6 +142,11 @@ function renderHome() {
 
   app.innerHTML = `
     <main class="screen">
+      <header class="version-header">
+        <span>ver 1.03</span>
+        <span>重複問題排除・単調問題24問を多段階推論問題に差替え</span>
+        <span class="version-date">2025.05.30</span>
+      </header>
       <section class="hero-panel">
         <div class="metric-main">
           <div>
