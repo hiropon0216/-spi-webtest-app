@@ -1,9 +1,0 @@
-{
-  "name": "SPI Webテスティング風トレーニング",
-  "short_name": "SPI対策",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#f5f4ef",
-  "theme_color": "#16251f",
-  "icons": []
-}
