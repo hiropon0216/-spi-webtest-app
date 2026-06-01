@@ -445,6 +445,50 @@ button {
   white-space: pre-wrap;
 }
 
+.review-item.wrong-item {
+  border-color: rgba(255, 90, 90, 0.4);
+}
+
+.review-item.unanswered {
+  border-color: rgba(200, 160, 60, 0.4);
+  background: #231e0e;
+}
+
+.result-label {
+  font-weight: bold;
+  font-size: 13px;
+  margin-top: 4px !important;
+}
+
+.correct-label { color: #44d89a; }
+.wrong-label   { color: #ff6b6b; }
+.unanswered-label { color: #e8b84b; }
+
+.review-item details {
+  margin-top: 8px;
+}
+
+.review-item details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 13px;
+  list-style: none;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.review-item details summary::-webkit-details-marker { display: none; }
+.review-item details summary::before { content: "▶ "; font-size: 10px; }
+.review-item details[open] summary::before { content: "▼ "; font-size: 10px; }
+
+.review-item details p {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent);
+}
+
 .toast {
   position: fixed;
   left: 50%;

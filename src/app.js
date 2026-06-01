@@ -349,9 +349,11 @@ function finishSession() {
   const session = state.session;
   const elapsedSec = Math.round((Date.now() - session.startedAt) / 1000);
   const correct = session.answers.filter((answer) => answer.correct).length;
-  const total = session.answers.length;
+  // 模試の場合は「全出題問題数」を分母にする（時間切れで未回答でも総問題数で割る）
+  const total = session.questions.length;
+  const answeredCount = session.answers.length;
   const accuracy = percent(correct, total);
-  const avgTime = total ? Math.round(elapsedSec / total) : 0;
+  const avgTime = answeredCount ? Math.round(elapsedSec / answeredCount) : 0;
 
   if (session.type === "chapter") {
     session.answers.forEach((answer) => {
@@ -391,18 +393,29 @@ function finishSession() {
 
 function renderResult() {
   const session = state.session;
-  const reviewedAnswers = session.answers
-    .map((answer) => {
-      const question = questions.find((item) => item.id === answer.questionId);
-      const sessionQuestion = session.questions.find((item) => item.id === answer.questionId);
-      return { ...answer, question: sessionQuestion || question };
-    });
+  // 回答済み問題をIDで引けるMapを作成
+  const answeredMap = new Map(session.answers.map((a) => [a.questionId, a]));
+  // 全出題問題をレビュー対象にする（未回答も含む）
+  const reviewedAnswers = session.questions.map((sessionQuestion) => {
+    const answer = answeredMap.get(sessionQuestion.id);
+    if (answer) {
+      return { ...answer, question: sessionQuestion };
+    }
+    // 未回答（時間切れ）
+    return {
+      questionId: sessionQuestion.id,
+      choiceIndex: -1,
+      correct: false,
+      unanswered: true,
+      question: sessionQuestion
+    };
+  });
   const actualWrongAnswers = reviewedAnswers.filter((answer) => !answer.correct);
-  const wrongAnswers = reviewedAnswers;
 
   const chapter = chapters.find((item) => item.id === session.chapterId);
   const weakTags = summarizeWeakTags(actualWrongAnswers);
-  const areaStats = summarizeAreas(session.answers);
+  // 分野別集計も全問題（未回答含む）を対象にする
+  const areaStats = summarizeAreas(reviewedAnswers);
 
   app.innerHTML = `
     <main class="screen">
@@ -454,10 +467,11 @@ function summarizeWeakTags(wrongAnswers) {
     .map(([tag]) => tag);
 }
 
-function summarizeAreas(answers) {
+function summarizeAreas(reviewedAnswers) {
   const rows = new Map();
-  answers.forEach((answer) => {
-    const question = questions.find((item) => item.id === answer.questionId);
+  reviewedAnswers.forEach((answer) => {
+    // answer.questionはrenderResult内でセット済み、なければquestions配列から取得
+    const question = answer.question || questions.find((item) => item.id === answer.questionId);
     const label = question?.area === "verbal" ? "言語" : "非言語";
     const row = rows.get(label) || { label, total: 0, correct: 0 };
     row.total += 1;
@@ -479,13 +493,29 @@ function renderAreaStat(item) {
 }
 
 function renderReviewItem(item) {
+  if (item.unanswered) {
+    return `
+      <article class="review-item unanswered">
+        <strong>${escapeHtml(item.question.prompt)}</strong>
+        <p class="result-label unanswered-label">結果：未回答（時間切れ）</p>
+        <p>正解：${escapeHtml(item.question.choices[item.question.answer])}</p>
+        <details>
+          <summary>解説を見る</summary>
+          <p>${escapeHtml(item.question.explanation)}</p>
+        </details>
+      </article>
+    `;
+  }
   return `
-    <article class="review-item">
+    <article class="review-item ${item.correct ? "" : "wrong-item"}">
       <strong>${escapeHtml(item.question.prompt)}</strong>
-      <p>${item.correct ? "結果：正解" : "結果：不正解"}</p>
+      <p class="result-label ${item.correct ? "correct-label" : "wrong-label"}">${item.correct ? "結果：正解" : "結果：不正解"}</p>
       <p>あなたの回答：${escapeHtml(item.question.choices[item.choiceIndex])}</p>
       <p>正解：${escapeHtml(item.question.choices[item.question.answer])}</p>
-      <p>${escapeHtml(item.question.explanation)}</p>
+      <details${item.correct ? "" : " open"}>
+        <summary>解説を見る</summary>
+        <p>${escapeHtml(item.question.explanation)}</p>
+      </details>
     </article>
   `;
 }
