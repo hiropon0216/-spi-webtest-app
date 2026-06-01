@@ -1,4 +1,4 @@
-const CACHE_NAME = "spi-webtest-app-v7";
+const CACHE_NAME = "spi-webtest-app-v8";
 const ASSETS = [
   "./",
   "./index.html",
